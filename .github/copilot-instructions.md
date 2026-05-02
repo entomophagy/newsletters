@@ -7,7 +7,7 @@ This repository does not have a build system, automated test suite, or linter co
 | Task | Command |
 | --- | --- |
 | Refresh newsletter PDFs | `bash downloadPdf.sh` |
-| Rename PDFs from extracted titles | `./renamePdfs.swift` |
+| Rename PDFs from extracted titles | `./renamePdfs.swift [path/to/file.pdf]` |
 | Run a single test | Not available |
 | Run full test suite | Not available |
 | Run linter | Not available |
@@ -18,7 +18,7 @@ This repository does not have a build system, automated test suite, or linter co
 
 This is a flat artifact repository, not an application codebase. The root directory is the data store: each tracked PDF is a newsletter file downloaded from `https://www.entomophagy.or.jp/newsletter`.
 
-The only workflow logic lives in `downloadPdf.sh` and `renamePdfs.swift`. The download script mirrors the upstream newsletter page with `wget --recursive --accept .pdf`, removes the currently tracked PDFs from the repo root, moves newly downloaded PDFs from `www.entomophagy.or.jp/_files/ugd/` into the root, deletes the temporary mirrored directory, then runs the Swift renamer. The renamer uses PDFKit to read the first page and normalizes filenames to the visible newsletter or article title. In practice, most commits are binary file refreshes rather than source changes.
+The only workflow logic lives in `downloadPdf.sh` and `renamePdfs.swift`. The download script mirrors the upstream newsletter page with `wget --recursive --accept .pdf`, removes the currently tracked PDFs from the repo root, moves newly downloaded PDFs from `www.entomophagy.or.jp/_files/ugd/` into the root, deletes the temporary mirrored directory, then runs the Swift renamer. The renamer uses PDFKit to read the first page and normalizes filenames to the visible newsletter or article title; when given a file path argument it renames only that PDF in place. In practice, most commits are binary file refreshes rather than source changes.
 
 ## Key conventions
 
