@@ -143,41 +143,79 @@ func sanitizedFilename(_ title: String) -> String {
 }
 
 let fileManager = FileManager.default
-let currentDirectory = URL(fileURLWithPath: fileManager.currentDirectoryPath)
-let pdfURLs = try fileManager.contentsOfDirectory(at: currentDirectory, includingPropertiesForKeys: nil)
-    .filter { $0.pathExtension.lowercased() == "pdf" }
-    .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+func usage() -> String {
+    "Usage: \(CommandLine.arguments[0]) [path/to/file.pdf]"
+}
+
+func pdfURLsToProcess() throws -> [URL] {
+    let currentDirectory = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+
+    switch CommandLine.arguments.count {
+    case 1:
+        return try fileManager.contentsOfDirectory(at: currentDirectory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension.lowercased() == "pdf" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    case 2:
+        let inputPath = CommandLine.arguments[1]
+        let candidateURL = URL(fileURLWithPath: inputPath, relativeTo: currentDirectory).standardizedFileURL
+        var isDirectory: ObjCBool = false
+
+        guard fileManager.fileExists(atPath: candidateURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            throw NSError(domain: "renamePdfs", code: 5, userInfo: [NSLocalizedDescriptionKey: "PDF file not found: \(inputPath)"])
+        }
+
+        guard candidateURL.pathExtension.lowercased() == "pdf" else {
+            throw NSError(domain: "renamePdfs", code: 6, userInfo: [NSLocalizedDescriptionKey: "Expected a PDF file path: \(inputPath)"])
+        }
+
+        return [candidateURL]
+    default:
+        throw NSError(domain: "renamePdfs", code: 7, userInfo: [NSLocalizedDescriptionKey: usage()])
+    }
+}
+
+func destinationURL(for pdfURL: URL, from lines: [String]) throws -> URL {
+    let destinationName: String
+    if let schedule = scheduleTitle(from: lines) {
+        destinationName = sanitizedFilename(schedule) + ".pdf"
+    } else if let volume = lines.first.flatMap(extractVolume) {
+        let title = manualTitles[volume] ?? fallbackTitle(from: lines)
+        guard let title else {
+            throw NSError(domain: "renamePdfs", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not determine title for volume \(volume) in \(pdfURL.lastPathComponent)"])
+        }
+        destinationName = String(format: "Vol.%02d_%@.pdf", volume, sanitizedFilename(title))
+    } else {
+        throw NSError(domain: "renamePdfs", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not detect newsletter volume or event title in \(pdfURL.lastPathComponent)"])
+    }
+
+    return pdfURL.deletingLastPathComponent().appendingPathComponent(destinationName)
+}
+
+let pdfURLs: [URL]
+do {
+    pdfURLs = try pdfURLsToProcess()
+} catch {
+    fputs("error: \(error.localizedDescription)\n", stderr)
+    exit(1)
+}
 
 var failures: [String] = []
 
 for pdfURL in pdfURLs {
     do {
         let lines = try readFirstPageLines(from: pdfURL)
-
-        let destinationName: String
-        if let schedule = scheduleTitle(from: lines) {
-            destinationName = sanitizedFilename(schedule) + ".pdf"
-        } else if let volume = lines.first.flatMap(extractVolume) {
-            let title = manualTitles[volume] ?? fallbackTitle(from: lines)
-            guard let title else {
-                throw NSError(domain: "renamePdfs", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not determine title for volume \(volume) in \(pdfURL.lastPathComponent)"])
-            }
-            destinationName = String(format: "Vol.%02d_%@.pdf", volume, sanitizedFilename(title))
-        } else {
-            throw NSError(domain: "renamePdfs", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not detect newsletter volume or event title in \(pdfURL.lastPathComponent)"])
-        }
-
-        let destinationURL = currentDirectory.appendingPathComponent(destinationName)
-        if destinationURL == pdfURL {
+        let destinationURL = try destinationURL(for: pdfURL, from: lines)
+        if destinationURL.standardizedFileURL == pdfURL.standardizedFileURL {
             continue
         }
 
         if fileManager.fileExists(atPath: destinationURL.path) {
-            throw NSError(domain: "renamePdfs", code: 4, userInfo: [NSLocalizedDescriptionKey: "Destination already exists: \(destinationName)"])
+            throw NSError(domain: "renamePdfs", code: 4, userInfo: [NSLocalizedDescriptionKey: "Destination already exists: \(destinationURL.lastPathComponent)"])
         }
 
         try fileManager.moveItem(at: pdfURL, to: destinationURL)
-        print("\(pdfURL.lastPathComponent) -> \(destinationName)")
+        print("\(pdfURL.lastPathComponent) -> \(destinationURL.lastPathComponent)")
     } catch {
         failures.append(error.localizedDescription)
     }
