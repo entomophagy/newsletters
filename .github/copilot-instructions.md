@@ -19,7 +19,9 @@ The remaining workflow logic lives in `renamePdfs.swift`. The renamer uses PDFKi
 
 ## Key conventions
 
-- Keep newsletter PDFs at the repository root. Do not reorganize them into subdirectories unless the repository structure is intentionally being redesigned.
-- Normalize filenames to the visible newsletter or article title instead of keeping the hashed upstream download names.
-- Avoid leaving behind temporary download or extraction output in the repository root; the repo convention is that tracked PDFs and the rename helper live at the top level.
-- Most meaningful changes in this repo are additions, removals, or replacements of PDF binaries. Text edits are usually limited to the rename script or repository metadata such as this file.
+- Keep the repository flat. Store tracked PDFs at the repository root rather than reorganizing them into topic or year subdirectories unless the repository structure itself is being intentionally redesigned.
+- Treat this repository as a curated PDF archive, not an automated download workspace. Do not assume a download script or a refresh pipeline exists when making changes.
+- Preserve human-readable filenames. Newsletter issues should continue to use the existing `Vol.%02d_<title>.pdf` pattern, and non-series documents should use the visible document title as the filename.
+- Use `renamePdfs.swift` only for filename normalization or targeted cleanup of PDF names. If a new document does not fit the current rules, update the script deliberately instead of inventing one-off naming schemes.
+- Do not leave temporary working files in the root directory. Aside from repository metadata and helper files such as `renamePdfs.swift`, the top level should stay focused on the tracked PDF collection.
+- Most meaningful changes in this repo are PDF additions, removals, replacements, or renames. Text edits are usually limited to repository metadata or the rename helper.
